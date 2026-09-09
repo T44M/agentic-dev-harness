@@ -45,6 +45,21 @@ Idea Issue
 
 詳細は [docs/DESIGN.md](docs/DESIGN.md) を参照してください。
 
+## 当面の実行・認証方針
+
+予算の都合で、当面はWSL上のCodex CLI＋ChatGPTログインを使用します。APIキー方式への移行は将来課題です。現在の実装はダミーのままで、実接続は未確認です。
+
+- 次の作業は #5 の接続確認部分：HarnessからCodexを1回呼んで短い応答を受け取る。
+- #5のPlan生成完成には #2 → #4 が必要。#6の投稿・承認確認はWSLから先行する。
+- Codex認証とGitHub操作用認証は別に扱い、Policyに認証情報を入れない。
+- 通常CIはダミー/モックで継続。実Agent確認は当面手動。
+- Actions接続・Runner配置・認証維持は [#9](https://github.com/T44M/agentic-dev-harness/issues/9) で解決する。self-hosted Runnerは未採用・未確定。
+- #3の実行契約確定と #7のE2E完了には #9 の解決が必要。
+- MVP完成条件はActions起動を含むまま維持する。ローカル動作のみではMVP完了としない。
+
+推奨順：#5の接続確認 → #2 → #4 → #5のPlan生成完成 → #6のローカル投稿・承認確認 → #9解決 → #3完成 → #7。
+#9の調査と#3のテンプレート草案は先行可能。#1は完了状態を維持します。
+
 ## ローカル実行
 
 Python 3.12 以上を使用します。実行時の外部ライブラリ依存はありません。
@@ -137,7 +152,7 @@ Planner は `plan(request) -> PlannerResult` の境界で差し替えます。
 
 ## Phase 0 Backlog
 
-MVP に必要な作業は7件です。Issue本文、依存関係、完了条件は [docs/DESIGN.md](docs/DESIGN.md#phase-0-backlog) に整理しています。
+Phase 0の7件に、実行基盤の課題 #9 を追加しています。Issue本文、依存関係、完了条件は [docs/DESIGN.md](docs/DESIGN.md#11-phase-0-backlog) に整理しています。
 
 1. [MVP-01: Harness CLIの最小骨格と実行契約を定義する](https://github.com/T44M/agentic-dev-harness/issues/1)
 2. [MVP-02: `.agent/policy.yaml`の最小仕様とLoaderを作る](https://github.com/T44M/agentic-dev-harness/issues/2)
@@ -147,4 +162,4 @@ MVP に必要な作業は7件です。Issue本文、依存関係、完了条件�
 6. [MVP-06: Planコメント投稿とHuman Gate 1を実装する](https://github.com/T44M/agentic-dev-harness/issues/6)
 7. [MVP-07: `home-dns-observability`でPlannerループをE2E検証する](https://github.com/T44M/agentic-dev-harness/issues/7)
 
-推奨する最初の Issue は [MVP-01](https://github.com/T44M/agentic-dev-harness/issues/1) です。
+次は [#5](https://github.com/T44M/agentic-dev-harness/issues/5) のWSL接続確認部分に着手します。
