@@ -69,4 +69,12 @@ agentic-dev-harness/
 
 MVP に必要な作業は7件です。Issue本文、依存関係、完了条件は [docs/DESIGN.md](docs/DESIGN.md#phase-0-backlog) に整理しています。
 
-推奨する最初の Issue は **Harness CLI の最小骨格と実行契約を定義する** です。
+1. [MVP-01: Harness CLIの最小骨格と実行契約を定義する](https://github.com/T44M/agentic-dev-harness/issues/1)
+2. [MVP-02: `.agent/policy.yaml`の最小仕様とLoaderを作る](https://github.com/T44M/agentic-dev-harness/issues/2)
+3. [MVP-03: 対象Repository用の薄いWorkflow契約を作る](https://github.com/T44M/agentic-dev-harness/issues/3)
+4. [MVP-04: 固定Contextと限定探索のCollectorを実装する](https://github.com/T44M/agentic-dev-harness/issues/4)
+5. [MVP-05: Planner実行と構造化Plan形式を実装する](https://github.com/T44M/agentic-dev-harness/issues/5)
+6. [MVP-06: Planコメント投稿とHuman Gate 1を実装する](https://github.com/T44M/agentic-dev-harness/issues/6)
+7. [MVP-07: `home-dns-observability`でPlannerループをE2E検証する](https://github.com/T44M/agentic-dev-harness/issues/7)
+
+推奨する最初の Issue は [MVP-01](https://github.com/T44M/agentic-dev-harness/issues/1) です。
