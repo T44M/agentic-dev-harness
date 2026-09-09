@@ -62,6 +62,21 @@ Harness は次を一貫して管理します。
 
 最初の対象は `home-dns-observability` ですが、Phase 0 では変更しません。
 
+## 当面の実行・認証方針
+
+予算の都合で、当面はWSL上のCodex CLI＋ChatGPTログインを使用します。APIキー方式への移行は将来課題です。現在の実装はダミーのままで、実接続は未確認です。
+
+- 次の作業は #5 の接続確認部分：HarnessからCodexを1回呼んで短い応答を受け取る。
+- #5のPlan生成完成には #2 → #4 が必要。#6の投稿・承認確認はWSLから先行する。
+- Codex認証とGitHub操作用認証は別に扱い、Policyに認証情報を入れない。
+- 通常CIはダミー/モックで継続。実Agent確認は当面手動。
+- Actions接続・Runner配置・認証維持は [#9](https://github.com/T44M/agentic-dev-harness/issues/9) で解決する。self-hosted Runnerは未採用・未確定。
+- #3の実行契約確定と #7のE2E完了には #9 の解決が必要。
+- MVP完成条件はActions起動を含むまま維持する。ローカル動作のみではMVP完了としない。
+
+推奨順：#5の接続確認 → #2 → #4 → #5のPlan生成完成 → #6のローカル投稿・承認確認 → #9解決 → #3完成 → #7。
+#9の調査と#3のテンプレート草案は先行可能。#1は完了状態を維持します。
+
 ## 5. 全体フローと状態
 
 ```mermaid
@@ -195,11 +210,11 @@ templates/    対象 Repository 用 Workflow / Policy
 - `Planner.plan(request) -> PlannerResult` を差し替え境界とし、現時点は DummyPlanner のみ。
 - pytest と Ruff を PR / main push の CI で実行する。
 - 入出力・終了コードの詳細は [README](../README.md#入出力契約mvp-01) に集約する。
-- Policy の読み込みは MVP-02、実 Plan の Schema と Agent 接続は MVP-05 で扱う。
+- Policy の読み込みは MVP-02、実 Plan の Schema とWSLでのCodex接続は MVP-05、Actions実行基盤は #9 で扱う。
 
 ## 11. Phase 0 Backlog
 
-以下の7件を GitHub Issue として作成します。番号は作成後の GitHub Issue 番号に置き換わるため、ここでは `MVP-01` から `MVP-07` を安定した識別子として使います。
+Phase 0でMVP-01〜07を #1〜#7 として作成済みです。認証方針変更に伴い #9 を追加しました。以下は当初の作業概要で、各Issueの詳細な最新完了条件はGitHub Issue本文を参照してください。
 
 ### MVP-01 Harness CLI の最小骨格と実行契約を定義する
 
@@ -259,7 +274,7 @@ Idea Issue から Harness の Planner を起動する Integration をテンプ�
 - Idea Issue と通常 Issue を区別する条件が文書化される
 - この Issue では `home-dns-observability` へ配置しない
 
-**依存** MVP-01
+**依存** MVP-01、#9（草案は先行可能）
 
 ### MVP-04 固定 Context と限定探索の Collector を実装する
 
@@ -323,7 +338,7 @@ Plan を元 Idea Issue に投稿し、人間の承認状態を Harness が識別
 - 未承認のまま次工程へ進まない
 - 同一実行を再送してもコメントが無制限に増えない
 
-**依存** MVP-03、MVP-05
+**依存** MVP-05（WSLから投稿・承認確認。Actions接続はMVP-07）
 
 ### MVP-07 `home-dns-observability` で Planner ループを E2E 検証する
 
@@ -343,7 +358,13 @@ Plan を元 Idea Issue に投稿し、人間の承認状態を Harness が識別
 - `home-dns-observability` の既存監視・Reporting 実行に影響を与えない
 - 次段階の Developer / Reviewer 実装に必要な不足が Issue 化される
 
-**依存** MVP-06
+**依存** MVP-06、MVP-03、#9
+
+### 追加課題 #9 Actions接続・Runner・認証維持
+
+WSL＋ChatGPTログインからActions運用へ接続する方式を決定・検証します。
+MVP-03の実行契約確定とMVP-07の完了をブロックしますが、MVP-02/04/05/06のローカル開発は進められます。
+APIキー方式は将来の選択肢として保持し、採用には別途予算合意が必要です。
 
 ## 12. 依存関係と推奨実装順
 
@@ -353,14 +374,17 @@ flowchart TD
     A --> C[MVP-03 Workflow]
     B --> D[MVP-04 Context Collector]
     D --> E[MVP-05 Planner]
-    C --> F[MVP-06 Commentと承認]
+    X[課題9 実行基盤] --> C
+    E --> F[MVP-06 ローカル投稿と承認]
     E --> F
     F --> G[MVP-07 E2E]
+    C --> G
+    X --> G
 ```
 
-推奨順は `MVP-01 → MVP-02 → MVP-04 → MVP-05 → MVP-03 → MVP-06 → MVP-07` です。
+MVP-01は完了。次はMVP-05のWSL接続確認部分 → MVP-02 → MVP-04 → MVP-05完成 → MVP-06 → #9解決 → MVP-03完成 → MVP-07です。接続確認部分はMVP-04を待たず実施できます。
 
-`MVP-03` は `MVP-02` から独立して進められますが、最初は Harness 本体の入出力を固めてから Workflow を作る方が手戻りを抑えられます。
+MVP-03の草案と#9の調査は先行可能ですが、MVP-03完了には#9での実行契約確定が必要です。
 
 ## 13. Phase 0 の完了条件
 
@@ -373,7 +397,7 @@ flowchart TD
 
 ## 14. Phase 0 で意図的に未確定とすること
 
-- Planner に使う Coding Agent の最終選択と切替方式
+- 当面のPlannerはCodex CLI＋ChatGPTログイン。将来のAgent切替方式は未確定
 - Human Gate 1 の具体的な GitHub 操作（Label、Reaction、Command など）
 - Harness の配布方法（Reusable Workflow、Action、CLI パッケージのどれを主にするか）
 - GitHub App が必要になる時点と権限設計
