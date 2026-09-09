@@ -188,6 +188,15 @@ templates/    対象 Repository 用 Workflow / Policy
 
 特定 Agent SDK、独自キュー、データベース、プラグイン機構は、必要性が実証されるまで導入しません。
 
+### MVP-01 で確定したこと
+
+- Python 3.12 以上、`src/` 配置、標準ライブラリの `argparse` による CLI。
+- `agentic-dev-harness plan` が Repository、Issue 番号、Policy パスを受け取り JSON を返す。
+- `Planner.plan(request) -> PlannerResult` を差し替え境界とし、現時点は DummyPlanner のみ。
+- pytest と Ruff を PR / main push の CI で実行する。
+- 入出力・終了コードの詳細は [README](../README.md#入出力契約mvp-01) に集約する。
+- Policy の読み込みは MVP-02、実 Plan の Schema と Agent 接続は MVP-05 で扱う。
+
 ## 11. Phase 0 Backlog
 
 以下の7件を GitHub Issue として作成します。番号は作成後の GitHub Issue 番号に置き換わるため、ここでは `MVP-01` から `MVP-07` を安定した識別子として使います。

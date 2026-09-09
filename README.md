@@ -29,9 +29,9 @@ Merge は常に人間が行います。既存アーキテクチャ内の変更�
 
 最初の dogfooding 対象は `home-dns-observability` です。
 
-## 現在地: Phase 0
+## 現在地: MVP-01
 
-Phase 0 は設計と開発バックログの作成だけを対象とします。Harness の実行コードや `home-dns-observability` 側の Integration はまだ実装しません。
+Phase 0 の設計・バックログ作成を終え、Python 3.12 以上で動く最小 CLI を実装しています。現在の Planner はオフラインのダミーです。実 Agent 接続、Context 収集、対象 Repository の Integration は未実装です。
 
 最初の MVP は、次の Planner ループが GitHub Actions 上で実際に成立することです。
 
@@ -45,16 +45,86 @@ Idea Issue
 
 詳細は [docs/DESIGN.md](docs/DESIGN.md) を参照してください。
 
-## Phase 0 の構成
+## ローカル実行
 
-```text
-agentic-dev-harness/
-├── README.md
-└── docs/
-    └── DESIGN.md
+Python 3.12 以上を使用します。実行時の外部ライブラリ依存はありません。
+初回セットアップ（Repository のルートで実行）:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
 ```
 
-実装開始後に必要になった時点で、`src/`、`tests/`、`templates/` を追加します。空の将来用ディレクトリは先に作りません。
+セットアップ後は1コマンドでダミー Plan が出ます。GitHub 認証や Policy ファイルは不要です。
+
+```bash
+agentic-dev-harness plan --repository example/demo --issue 1
+```
+
+`python -m agentic_dev_harness plan --repository example/demo --issue 1` でも実行できます。
+
+### 入出力契約（MVP-01）
+
+| 入力 | 契約 |
+|---|---|
+| `plan` | ダミー Planner を実行するサブコマンド |
+| `--repository` | 必須。`OWNER/REPO` 形式。URL は不可 |
+| `--issue` | 必須。1以上の整数 |
+| `--policy` | 任意。既定値 `.agent/policy.yaml`。空白のみは不可 |
+
+Policy パスは文字列として渡すだけで、存在確認・読み込み・適用は行いません。
+相対パスの起点は、後続の Loader 実装時には CLI の作業ディレクトリとします。
+Repository・Issue も識別子として扱い、取得や存在確認はしません。
+
+標準出力には JSON オブジェクトを1つだけ出力します。
+
+```json
+{
+  "schema_version": 1,
+  "status": "dummy",
+  "request": {
+    "repository": "example/demo",
+    "issue_number": 1,
+    "policy_path": ".agent/policy.yaml"
+  },
+  "plan": {
+    "summary": "Dummy plan for example/demo#1",
+    "steps": ["Placeholder only: no context collected or implementation performed."]
+  }
+}
+```
+
+`status: dummy` は動作確認用であり、実装可能な Plan や人間の承認済み状態を示しません。
+Plan の本仕様・検証・Markdown 変換は MVP-05 で実装します。
+
+| 終了コード | 意味 |
+|---|---|
+| `0` | 成功（`--help` を含む） |
+| `1` | Planner 実行または結果の JSON 化に失敗 |
+| `2` | 引数の不足・不正 |
+
+失敗時は標準エラーへ診断を出し、標準出力には Plan を出しません。
+
+### 開発・確認
+
+```bash
+python -m pytest
+python -m ruff check .
+python -m ruff format --check .
+```
+
+同じ確認と CLI の実行を GitHub Actions で PR 時および main への push 時に行います。
+
+### 最小構成
+
+- `src/agentic_dev_harness/cli.py`: 引数検証・JSON 出力
+- `src/agentic_dev_harness/planner.py`: Request / Result と `Planner` Protocol、DummyPlanner
+- `tests/`: CLI の実プロセス実行、入力検証、Planner 差し替え・失敗のテスト
+- `.github/workflows/ci.yml`: Harness 自身の Test / Lint / CLI 確認
+
+Planner は `plan(request) -> PlannerResult` の境界で差し替えます。
+特定 Agent SDK やプラグイン機構は導入していません。
 
 ## MVP の原則
 
