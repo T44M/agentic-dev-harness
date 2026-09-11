@@ -31,7 +31,7 @@ Merge は常に人間が行います。既存アーキテクチャ内の変更�
 
 ## 現在地: MVP-01
 
-Phase 0 の設計・バックログ作成を終え、Python 3.12 以上で動く最小 CLI を実装しています。現在の Planner はオフラインのダミーです。実 Agent 接続、Context 収集、対象 Repository の Integration は未実装です。
+Phase 0 の設計・バックログ作成を終え、Python 3.12 以上で動く最小 CLI を実装しています。現在の Planner はオフラインのダミーです。固定入力のCodex接続確認を追加しました。Context収集・実Plan生成・対象RepositoryのIntegrationは未実装です。
 
 最初の MVP は、次の Planner ループが GitHub Actions 上で実際に成立することです。
 
@@ -47,9 +47,9 @@ Idea Issue
 
 ## 当面の実行・認証方針
 
-予算の都合で、当面はWSL上のCodex CLI＋ChatGPTログインを使用します。APIキー方式への移行は将来課題です。現在の実装はダミーのままで、実接続は未確認です。
+予算の都合で、当面はWSL上のCodex CLI＋ChatGPTログインを使用します。APIキー方式への移行は将来課題です。ダミーに加えて固定入力のCodex接続確認を実装しています。WSLでの実接続は未確認です。
 
-- 次の作業は #5 の接続確認部分：HarnessからCodexを1回呼んで短い応答を受け取る。
+- #5の接続確認コードを実装済み。WSLでの手動確認後、#2 → #4へ進む。
 - #5のPlan生成完成には #2 → #4 が必要。#6の投稿・承認確認はWSLから先行する。
 - Codex認証とGitHub操作用認証は別に扱い、Policyに認証情報を入れない。
 - 通常CIはダミー/モックで継続。実Agent確認は当面手動。
@@ -78,6 +78,17 @@ agentic-dev-harness plan --repository example/demo --issue 1
 ```
 
 `python -m agentic_dev_harness plan --repository example/demo --issue 1` でも実行できます。
+
+### Codex接続確認（#5の一部）
+
+```bash
+agentic-dev-harness plan --repository T44M/home-dns-observability --issue 13 --codex-smoke-test
+```
+
+ChatGPTログインで固定応答を確認します。成功時は`status: connection_verified`を返し、
+Plan生成済みとは扱いません。`--timeout`は推論の上限秒数（既定60、1〜300）です。
+WSLでのログイン・実行・結果記録は[接続確認手順](docs/CODEX_SMOKE_TEST.md)を参照してください。
+自動テストとWSL実接続の検証状況も記載しています。
 
 ### 入出力契約（MVP-01）
 
@@ -162,4 +173,4 @@ Phase 0の7件に、実行基盤の課題 #9 を追加しています。Issue本
 6. [MVP-06: Planコメント投稿とHuman Gate 1を実装する](https://github.com/T44M/agentic-dev-harness/issues/6)
 7. [MVP-07: `home-dns-observability`でPlannerループをE2E検証する](https://github.com/T44M/agentic-dev-harness/issues/7)
 
-次は [#5](https://github.com/T44M/agentic-dev-harness/issues/5) のWSL接続確認部分に着手します。
+次は [#5](https://github.com/T44M/agentic-dev-harness/issues/5) のWSL実接続を手動確認します。#5全体は未完了です。
