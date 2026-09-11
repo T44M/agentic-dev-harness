@@ -1,72 +1,79 @@
-# WSLでのCodex接続確認（#5の一部）
+# WSL Codex connectivity smoke test
 
-固定入力への応答を確認するだけの手順です。Issue本文・Policy・Contextの取得、
-構造化Plan生成、GitHub投稿は実装していません。#5全体の完了にはしません。
+This check verifies only that the Harness can invoke Codex CLI in WSL using ChatGPT login and receive a fixed response.
 
-## WSLで実行
+It does **not** fetch the Issue, collect Repository Context, generate a Business Requirements / Technical Specification, or post to GitHub.
 
-WSL内のPython 3.12以上とCodex CLIを使用します。Windows側のCLIではなく、
-`command -v codex`でWSL内の実行ファイルを確認してください。
+## Command
+
+Use Python 3.12+ and Codex CLI inside WSL.
 
 ```bash
-git fetch origin
-git switch --track origin/feat/issue-5-codex-smoke
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 codex --version
 codex login status
-```
 
-未ログインの場合は`codex login`でChatGPTログインしてください。既にChatGPTで
-ログイン済みなら再ログイン不要です。APIキー認証は本チェックでは受け付けません。
-認証ファイルやトークンをPR・Issueに貼り付けないでください。
-
-```bash
 agentic-dev-harness plan \
   --repository T44M/home-dns-observability \
   --issue 13 \
   --codex-smoke-test \
   --timeout 60
+
 echo $?
 ```
 
-成功条件は終了コード`0`、JSONの`status`が`connection_verified`、
-`plan.steps`に`HARNESS_CODEX_OK`があることです。`plan`という既存の出力フィールドを
-再利用していますが、これはPlan生成成功を意味しません。
-Repository・Issue番号は出力の識別子のみで、存在確認もCodexへの送信もしません。
+The repository and Issue number are identifiers in the current smoke-test output. The smoke test deliberately does not fetch or send their contents to Codex.
 
-確認後、PRにCodexバージョン、終了コード、上記status、実施日時を記録します。
-このPRをマージする操作は本手順に含めません。
+## Success criteria
 
-## 実行と失敗の扱い
+- exit code `0`
+- JSON `status` is `connection_verified`
+- output contains `HARNESS_CODEX_OK`
 
-- `Planner.plan(request)`から、ログイン状態確認を1回、`codex exec`を1回呼びます。
-- ChatGPT認証とOpenAI providerを指定し、APIキー環境変数を子プロセスから除きます。
-- `codex login status`の既知のChatGPT表示だけを受け付け、不明な形式は停止します。
-  CLI更新で表示が変わった場合も、認証モードを推測して続行しません。
-- 空の一時ディレクトリから、stdinで固定入力を渡します。`read-only` sandbox、
-  承認要求なし（`never`）、`--ephemeral`を指定し、最終応答ファイルを厳密照合します。
-- ログイン確認は10秒、推論は既定60秒（`--timeout`で1〜300秒）で打ち切ります。
-  WSL/Linuxのプロセスグループを終了し、自動再試行しません。
-- 未ログイン、認証切れ、実行エラー、空・不正な応答、タイムアウトは終了コード`1`。
-  引数不正は`2`。失敗時はstdoutを空にし、stderrに診断だけを返します。
-- 生のCodexログをそのまま表示しません。失敗時はWSL内で`codex login status`、
-  ネットワーク・利用上限・CLI設定を確認してください。
+## Authentication and execution rules
 
-現在の設定・モデルは利用者のCodex設定に依存します。既存のユーザー設定やMCP等を
-全面隔離する実装ではありません。固定入力でツールを使わないよう指示していますが、
-Collectorの探索上限を強制する実行境界の完成・検証は#5後半の対象です。
-CLIが`--ephemeral`等に対応していない場合はエラー終了するため、CLIの更新を確認します。
+- Codex must report ChatGPT login.
+- API-key overrides are removed from the child environment for this path.
+- GitHub authentication is separate from Codex authentication.
+- The test runs from an empty temporary directory.
+- Codex uses read-only sandboxing, no approval prompts, and an ephemeral session.
+- Login check timeout is 10 seconds.
+- Inference timeout defaults to 60 seconds and may be set from 1 to 300 seconds.
+- Timeout kills the WSL/Linux process group and does not automatically retry.
+- Raw Codex logs are not surfaced as the CLI error message.
 
-## 検証状況
+Failures such as missing CLI, missing/expired ChatGPT login, unexpected authentication mode, execution failure, unreadable response, unexpected response, and timeout return a failure rather than being treated as a successful connection.
 
-- WorkのLinux/Python 3.12環境：偽Codex実行ファイルを用いたプロセステスト。
-  正常応答、認証モード拒否、未ログイン・認証切れ、応答欠落・不正、
-  タイムアウトと子プロセス停止、機密を含むログの非表示を確認します。
-- WSLでの本物のCodex＋ChatGPT接続：**未実施**。Workから利用者のWSLへは接続できず、
-  この環境にCodex CLIと利用者のChatGPT資格情報もありません。上記手順での確認が必要です。
-- 通常CIはネットワークやLLMを使わないテストのみ。実接続テストは手動です。
+## Verification status
 
-実装の参照元：
-[Codex CLI reference](https://developers.openai.com/codex/cli/reference/)、
-[Configuration reference](https://developers.openai.com/codex/config-reference/)。
+PR #10 (`feat: add Codex ChatGPT connectivity smoke test`) was merged after successful verification on the user's WSL environment on 2026-09-11 JST.
+
+Verified result:
+
+```text
+status: connection_verified
+HARNESS_CODEX_OK
+```
+
+GitHub Actions also passed for the offline test suite. Real Codex connectivity remains a manual check; normal CI does not use the user's ChatGPT credentials or perform live LLM calls.
+
+## Relationship to the current MVP
+
+The smoke test is retained as a common Codex execution foundation.
+
+The Specification-first MVP continues with:
+
+```text
+#11 GitHub Issue Adapter
+  ↓
+#4 Repository Context
+  ↓
+#5 Business Requirements / Technical Specification generation
+  ↓
+#6 Human Approval
+  ↓
+#7 E2E dogfood
+```
+
+When #5 needs real generation, the existing process-execution logic may be extracted into a small Stage-independent Codex Runner. The project must not turn this into a generic Agent SDK or Workflow Engine.
