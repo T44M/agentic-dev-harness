@@ -1,69 +1,168 @@
 # Agentic Development Harness
 
-GitHub Issue を起点に、既存の Coding Agent を制御して開発を進めるための上位レイヤーです。
+GitHub Issue と Repository を入力として、Codex CLI を実行エンジンに使いながら Software Development Lifecycle を段階的に進める薄い Development Harness です。
 
-このプロジェクトは Coding Agent 自体を作りません。Codex や Claude Code などを Planner、Developer、Reviewer として呼び出し、GitHub 上の状態、承認ゲート、実行回数、引き継ぐ Context を管理します。
+このプロジェクトは Coding Agent 自体を作りません。Codex など既存の Coding Agent に Role / Context / Policy / Task を与え、SDLC 上の Stage、Human Approval、GitHub 上の状態、実行回数を Harness が制御します。
 
-## 目指すフロー
+## 中心思想
 
-```text
-Idea Issue
-  -> Planner
-  -> Human Gate 1: Plan 承認
-  -> Development Issue 作成（最大5件）
-  -> Developer
-  -> Test / Lint
-  -> Reviewer
-  -> 修正（最大3回）
-  -> Pull Request
-  -> Human Gate 2: 確認・Merge
-  -> 次の Issue
-```
-
-Merge は常に人間が行います。既存アーキテクチャ内の変更とライブラリ追加は自律実行できますが、アーキテクチャ変更には人間の承認が必要です。
-
-## Repository の分担
-
-- `agentic-dev-harness`: Planner、Developer、Reviewer、Retry、GitHub 状態管理などの本体
-- 対象 Repository: `.github/workflows/agent.yml` と `.agent/policy.yaml` だけを持つ薄い Integration
-
-最初の dogfooding 対象は `home-dns-observability` です。
-
-## 現在地: MVP-01
-
-Phase 0 の設計・バックログ作成を終え、Python 3.12 以上で動く最小 CLI を実装しています。現在の Planner はオフラインのダミーです。固定入力のCodex接続確認を追加しました。Context収集・実Plan生成・対象RepositoryのIntegrationは未実装です。
-
-最初の MVP は、次の Planner ループが GitHub Actions 上で実際に成立することです。
+目標は AI Agent Platform や汎用 Workflow Engine を作ることではありません。
 
 ```text
-Idea Issue
-  -> 対象 Repository の薄い Workflow
-  -> Harness の Planner
-  -> 元 Idea Issue に Plan をコメント
-  -> 人間が Plan を承認
+GitHub Issue / Repository
+        ↓
+agentic-dev-harness
+        ↓
+Codex CLI
+        ↓
+Spec / Plan / Code / Test / PR
+        ↓
+GitHub
 ```
 
-詳細は [docs/DESIGN.md](docs/DESIGN.md) を参照してください。
+Harness は Software Development に限定し、SDLC 上の意味を持つ固定 Stage を扱います。
 
-## 当面の実行・認証方針
+```text
+SPECIFICATION
+    ↓
+PLANNING
+    ↓
+IMPLEMENTATION
+    ↓
+VALIDATION
+    ↓
+DONE
+```
 
-予算の都合で、当面はWSL上のCodex CLI＋ChatGPTログインを使用します。APIキー方式への移行は将来課題です。ダミーに加えて固定入力のCodex接続確認を実装しています。WSLでの実接続は未確認です。
+Issue に応じて途中 Stage から開始できます。具体的な Bug であれば Implementation から、大きな Idea であれば Specification から開始する想定です。
 
-- #5の接続確認コードを実装済み。WSLでの手動確認後、#2 → #4へ進む。
-- #5のPlan生成完成には #2 → #4 が必要。#6の投稿・承認確認はWSLから先行する。
-- Codex認証とGitHub操作用認証は別に扱い、Policyに認証情報を入れない。
-- 通常CIはダミー/モックで継続。実Agent確認は当面手動。
-- Actions接続・Runner配置・認証維持は [#9](https://github.com/T44M/agentic-dev-harness/issues/9) で解決する。self-hosted Runnerは未採用・未確定。
-- #3の実行契約確定と #7のE2E完了には #9 の解決が必要。
-- MVP完成条件はActions起動を含むまま維持する。ローカル動作のみではMVP完了としない。
+## やらないこと
 
-推奨順：#5の接続確認 → #2 → #4 → #5のPlan生成完成 → #6のローカル投稿・承認確認 → #9解決 → #3完成 → #7。
-#9の調査と#3のテンプレート草案は先行可能。#1は完了状態を維持します。
+現時点では以下を作りません。
+
+- 汎用 Workflow Builder / Canvas
+- 任意 Node 接続
+- 汎用 Trigger / IF / Webhook Engine
+- 任意 SaaS Connector 群
+- 独自 Coding Agent / 独自 LLM
+- 複雑な Multi-Agent Platform
+- Observability データ収集基盤
+- Reporting Engine
+
+n8n、Dify、LangGraph、OpenHands、Copilot Coding Agent 等は参考実装・競合調査対象であり、Harness の必須依存にはしません。
+
+## Harness の責務
+
+コア責務は以下に限定します。
+
+- GitHub Adapter
+- Repository Context
+- Codex Runner
+- Stage Controller
+- Approval
+- Policy / Usage Limits
+
+GitHub を Development Process の SoT とします。Harness 専用 DB は必要性が確認されるまで導入しません。
+
+## Codex 利用方針
+
+個人 PoC / dogfooding 段階では Codex CLI + ChatGPT ログインを基本とします。OpenAI API Key による従量課金は当面導入しません。
+
+将来的には 1 run あたりの呼び出し回数、retry、review / fix loop、timeout、Context 投入量などを制限できる設計にしますが、MVP では高度な Usage Management より成果物を確実に生成できることを優先します。
+
+Codex 認証と GitHub 操作用認証は別に扱います。
+
+## 現在地
+
+共通基盤として以下まで実装・確認済みです。
+
+- Python 3.12+ の最小 CLI
+- `plan --repository --issue`
+- Planner Protocol と DummyPlanner
+- pytest / Ruff / GitHub Actions CI
+- Codex CLI の固定入力 smoke test
+- ChatGPT ログイン強制
+- timeout / process stop / sanitized error
+- WSL から本物の Codex CLI を実行し `HARNESS_CODEX_OK` を確認
+
+PR #10 で WSL 実接続まで成功しています。Context 収集、実 Issue 取得、Business Requirements / Technical Specification 生成、GitHub 投稿は未実装です。
+
+既存 CLI と Codex 接続コードは捨てず、後続 Stage の共通基盤として再利用します。
+
+## Specification-first MVP
+
+最初の MVP は完全自律開発ではなく、Specification Stage を成立させることです。
+
+```text
+GitHub Issue Idea
+      ↓
+GitHub Adapter
+      ↓
+Repository Context Understanding
+      ↓
+Business Requirements
+      ↓
+Technical Specification
+      ↓
+Human Approval
+```
+
+MVP の最重要ゴールは、GitHub Issue に Idea を書けば、Repository の実態を踏まえた Business Requirements と Technical Specification が生成され、人間がレビューできる状態になることです。
+
+最初の dogfooding 対象は `T44M/home-dns-observability` です。
+
+### MVP のクリティカルパス
+
+1. [#11 GitHub Issue Adapter](https://github.com/T44M/agentic-dev-harness/issues/11)
+2. [#4 Repository Context / Context Manifest](https://github.com/T44M/agentic-dev-harness/issues/4)
+3. [#5 Business Requirements / Technical Specification generation](https://github.com/T44M/agentic-dev-harness/issues/5)
+4. [#6 Specification posting / Human Approval Gate](https://github.com/T44M/agentic-dev-harness/issues/6)
+5. [#7 home-dns-observability E2E](https://github.com/T44M/agentic-dev-harness/issues/7)
+
+MVP は WSL からの明示的な手動起動で成立させます。GitHub Actions から Codex を起動する Integration は Specification Stage が安定してから追加します。
+
+### MVP 後へ Defer
+
+- [#2 `.agent/policy.yaml` Loader](https://github.com/T44M/agentic-dev-harness/issues/2): Repository 固有設定が必要になってから導入
+- [#3 対象 Repository Workflow](https://github.com/T44M/agentic-dev-harness/issues/3): Actions Integration 段階で実装
+- [#9 Actions / Runner / ChatGPT login 維持](https://github.com/T44M/agentic-dev-harness/issues/9): #7 完了後に再開
+
+## Repository Context の原則
+
+Repository 全体を無制限に Codex へ投入しません。
+
+初期 MVP では Harness 内の安全な既定値で、README、AGENTS、主要 docs / manifest などの固定 Context と、Issue 内容に応じた限定探索を行います。何を読んだか、なぜ選んだか、不足情報、探索上限到達を Context Manifest に残します。
+
+`.agent/policy.yaml` は将来の Repository 固有上書きとして追加できる設計にしますが、MVP の必須前提にはしません。
+
+## Home DNS Observability との責務境界
+
+`home-dns-observability` は Observability / Reporting 側を担当します。
+
+```text
+Prometheus / Loki
+       ↓
+DNS Report
+       ↓
+Finding
+       ↓
+GitHub Issue
+────────────── Harness Boundary
+       ↓
+Specification / Planning
+       ↓
+Implementation
+       ↓
+Validation
+       ↓
+PR
+```
+
+Harness は GitHub Issue が作られたところから担当します。Observability データ収集や Reporting Engine 自体は Harness へ取り込みません。
 
 ## ローカル実行
 
-Python 3.12 以上を使用します。実行時の外部ライブラリ依存はありません。
-初回セットアップ（Repository のルートで実行）:
+Python 3.12 以上を使用します。
 
 ```bash
 python -m venv .venv
@@ -71,68 +170,45 @@ source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ```
 
-セットアップ後は1コマンドでダミー Plan が出ます。GitHub 認証や Policy ファイルは不要です。
+現在のダミー CLI:
 
 ```bash
-agentic-dev-harness plan --repository example/demo --issue 1
+agentic-dev-harness plan \
+  --repository example/demo \
+  --issue 1
 ```
 
-`python -m agentic_dev_harness plan --repository example/demo --issue 1` でも実行できます。
+標準出力には JSON オブジェクトを1つだけ返します。現時点の `plan` は既存 CLI 契約を保持するため残しており、Specification-first MVP の完成を意味しません。
 
-### Codex接続確認（#5の一部）
+### Codex 接続確認
 
 ```bash
-agentic-dev-harness plan --repository T44M/home-dns-observability --issue 13 --codex-smoke-test
+agentic-dev-harness plan \
+  --repository T44M/home-dns-observability \
+  --issue 13 \
+  --codex-smoke-test
 ```
 
-ChatGPTログインで固定応答を確認します。成功時は`status: connection_verified`を返し、
-Plan生成済みとは扱いません。`--timeout`は推論の上限秒数（既定60、1〜300）です。
-WSLでのログイン・実行・結果記録は[接続確認手順](docs/CODEX_SMOKE_TEST.md)を参照してください。
-自動テストとWSL実接続の検証状況も記載しています。
+成功時は終了コード `0`、`status: connection_verified`、`HARNESS_CODEX_OK` を返します。これは固定入力の接続確認だけで、Issue / Repository Context は Codex へ渡しません。
 
-### 入出力契約（MVP-01）
+詳細は [docs/CODEX_SMOKE_TEST.md](docs/CODEX_SMOKE_TEST.md) を参照してください。
 
-| 入力 | 契約 |
-|---|---|
-| `plan` | ダミー Planner を実行するサブコマンド |
-| `--repository` | 必須。`OWNER/REPO` 形式。URL は不可 |
-| `--issue` | 必須。1以上の整数 |
-| `--policy` | 任意。既定値 `.agent/policy.yaml`。空白のみは不可 |
+## 現在のコード構成
 
-Policy パスは文字列として渡すだけで、存在確認・読み込み・適用は行いません。
-相対パスの起点は、後続の Loader 実装時には CLI の作業ディレクトリとします。
-Repository・Issue も識別子として扱い、取得や存在確認はしません。
+```text
+src/agentic_dev_harness/
+├── cli.py       CLI / input validation / JSON output
+├── planner.py   現行 Request / Result / Planner Protocol / DummyPlanner
+└── codex.py     Codex smoke-test execution
 
-標準出力には JSON オブジェクトを1つだけ出力します。
-
-```json
-{
-  "schema_version": 1,
-  "status": "dummy",
-  "request": {
-    "repository": "example/demo",
-    "issue_number": 1,
-    "policy_path": ".agent/policy.yaml"
-  },
-  "plan": {
-    "summary": "Dummy plan for example/demo#1",
-    "steps": ["Placeholder only: no context collected or implementation performed."]
-  }
-}
+tests/
+├── test_cli.py
+└── test_codex.py
 ```
 
-`status: dummy` は動作確認用であり、実装可能な Plan や人間の承認済み状態を示しません。
-Plan の本仕様・検証・Markdown 変換は MVP-05 で実装します。
+現行コードは薄く、汎用 Workflow Engine 的な抽象化は入っていません。Specification 実装時に必要であれば Codex 実行部分を Stage 非依存の小さな Runner へ抽出しますが、Plugin Framework や任意 Node 機構は導入しません。
 
-| 終了コード | 意味 |
-|---|---|
-| `0` | 成功（`--help` を含む） |
-| `1` | Planner 実行または結果の JSON 化に失敗 |
-| `2` | 引数の不足・不正 |
-
-失敗時は標準エラーへ診断を出し、標準出力には Plan を出しません。
-
-### 開発・確認
+## 開発・確認
 
 ```bash
 python -m pytest
@@ -140,37 +216,10 @@ python -m ruff check .
 python -m ruff format --check .
 ```
 
-同じ確認と CLI の実行を GitHub Actions で PR 時および main への push 時に行います。
+## 次の開発順
 
-### 最小構成
+次は #11 の GitHub Issue Adapter です。その後 #4 → #5 → #6 → #7 の順に Specification Stage を完成させます。
 
-- `src/agentic_dev_harness/cli.py`: 引数検証・JSON 出力
-- `src/agentic_dev_harness/planner.py`: Request / Result と `Planner` Protocol、DummyPlanner
-- `tests/`: CLI の実プロセス実行、入力検証、Planner 差し替え・失敗のテスト
-- `.github/workflows/ci.yml`: Harness 自身の Test / Lint / CLI 確認
+Planning / Implementation / Validation は Specification-first MVP が成立してから、必要な最小単位で追加します。
 
-Planner は `plan(request) -> PlannerResult` の境界で差し替えます。
-特定 Agent SDK やプラグイン機構は導入していません。
-
-## MVP の原則
-
-- GitHub Issue を唯一の Idea 入口とする
-- Repository 全体を無制限に読み込まない
-- Planner が確認した Context と選定理由を Plan に残す
-- Plan 承認前は Development Issue や実装を開始しない
-- GitHub Actions を実行基盤とする
-- 独自 Web UI、SaaS 化、複雑な Multi-Agent Framework は作らない
-
-## Phase 0 Backlog
-
-Phase 0の7件に、実行基盤の課題 #9 を追加しています。Issue本文、依存関係、完了条件は [docs/DESIGN.md](docs/DESIGN.md#11-phase-0-backlog) に整理しています。
-
-1. [MVP-01: Harness CLIの最小骨格と実行契約を定義する](https://github.com/T44M/agentic-dev-harness/issues/1)
-2. [MVP-02: `.agent/policy.yaml`の最小仕様とLoaderを作る](https://github.com/T44M/agentic-dev-harness/issues/2)
-3. [MVP-03: 対象Repository用の薄いWorkflow契約を作る](https://github.com/T44M/agentic-dev-harness/issues/3)
-4. [MVP-04: 固定Contextと限定探索のCollectorを実装する](https://github.com/T44M/agentic-dev-harness/issues/4)
-5. [MVP-05: Planner実行と構造化Plan形式を実装する](https://github.com/T44M/agentic-dev-harness/issues/5)
-6. [MVP-06: Planコメント投稿とHuman Gate 1を実装する](https://github.com/T44M/agentic-dev-harness/issues/6)
-7. [MVP-07: `home-dns-observability`でPlannerループをE2E検証する](https://github.com/T44M/agentic-dev-harness/issues/7)
-
-次は [#5](https://github.com/T44M/agentic-dev-harness/issues/5) のWSL実接続を手動確認します。#5全体は未完了です。
+詳細設計は [docs/DESIGN.md](docs/DESIGN.md) を参照してください。
